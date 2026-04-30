@@ -2,11 +2,30 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <title>BEMAX Runner Game</title>
+    <title>The Wild Robot Runner</title>
     <style>
-        body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f7f7f7; font-family: Arial, sans-serif; overflow: hidden; }
-        #gameCanvas { border-bottom: 2px solid #535353; background-color: #fff; }
-        .info { position: absolute; top: 10px; text-align: center; }
+        body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #2c3e50; font-family: Arial, sans-serif; overflow: hidden; color: #fff; }
+        
+        /* تصميم الحاوية الخاصة باللعبة */
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 250px;
+            border: 4px solid #fff;
+            border-radius: 10px;
+            /* تحميل خلفية فيلم The Wild Robot */
+            background-image: url('wild_robot_bg.jpg'); 
+            background-size: cover;
+            background-position: center;
+            overflow: hidden; /* لإخفاء العوائق الخارجة عن الإطار */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        #gameCanvas {
+            background-color: rgba(255, 255, 255, 0.1); /* طبقة شفافة خفيفة فوق الخلفية */
+        }
+
+        .info { position: absolute; top: -50px; left: 0; width: 100%; text-align: center; }
     </style>
 </head>
 <body>
@@ -15,7 +34,10 @@
     <h2>اضغط على المسافة (Space) للقفز</h2>
     <div id="score">Score: 0</div>
 </div>
-<canvas id="gameCanvas"></canvas>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+</div>
 
 <script>
     const canvas = document.getElementById("gameCanvas");
@@ -23,55 +45,60 @@
     const scoreElement = document.getElementById("score");
 
     canvas.width = 800;
-    canvas.height = 200;
+    canvas.height = 250;
 
+    // --- تحميل الصور ---
+    const robotImg = new Image();
+    robotImg.src = 'robot_character.png'; // صورة الروبوت الذي أرفقته
+
+    // متغيرات اللعبة
     let score = 0;
-    let gameSpeed = 5;
+    let gameSpeed = 4;
     let isGameOver = false;
+    let gravity = 0.6;
 
-    // خصائص اللاعب
+    // خصائص الروبوت (اللاعب)
     const dino = {
         x: 50,
-        y: 150,
-        width: 40,
-        height: 40,
-        color: "#555",
+        y: 190, // بداية موقع الروبوت فوق "الأرض"
+        width: 50,  // يمكنك تعديل الحجم حسب صورتك
+        height: 60, // يمكنك تعديل الحجم حسب صورتك
         dy: 0,
-        jumpForce: 12,
-        gravity: 0.6,
+        jumpForce: 13,
         grounded: false
     };
 
-    // العوائق
+    // العوائق (يمكنك استبدالها بصور عوائق لاحقاً)
     const obstacles = [];
 
     function spawnObstacle() {
-        let size = Math.random() * (50 - 20) + 20;
+        let height = Math.random() * (60 - 30) + 30;
         obstacles.push({
             x: canvas.width,
-            y: canvas.height - size,
-            width: 20,
-            height: size,
-            color: "#ff4d4d"
+            y: canvas.height - height - 10, // فوق الأرض قليلاً
+            width: 25,
+            height: height,
+            color: "#ff4d4d" // لون العائق الأحمر
         });
     }
 
     function update() {
         if (isGameOver) return;
 
-        // حركة الديناصور والجاذبية
-        dino.dy += dino.gravity;
+        // حركة الروبوت والجاذبية
+        dino.dy += gravity;
         dino.y += dino.dy;
 
-        if (dino.y + dino.height > canvas.height) {
-            dino.y = canvas.height - dino.height;
+        // التصادم مع الأرض (تحديد حدود القاع)
+        if (dino.y + dino.height > canvas.height - 10) {
+            dino.y = canvas.height - dino.height - 10;
             dino.dy = 0;
             dino.grounded = true;
         }
 
-        // تحريك العوائق
-        if (Math.random() < 0.02) {
-            if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < canvas.width - 200) {
+        // تحريك وإنشاء العوائق
+        if (Math.random() < 0.015) { // احتمالية ظهور عائق جديد
+            if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < canvas.width - 250) {
                 spawnObstacle();
             }
         }
@@ -79,21 +106,22 @@
         for (let i = obstacles.length - 1; i >= 0; i--) {
             obstacles[i].x -= gameSpeed;
 
-            // التصادم
+            // كشف التصادم
             if (dino.x < obstacles[i].x + obstacles[i].width &&
                 dino.x + dino.width > obstacles[i].x &&
                 dino.y < obstacles[i].y + obstacles[i].height &&
                 dino.y + dino.height > obstacles[i].y) {
                 isGameOver = true;
                 alert("Game Over! Score: " + score);
-                location.reload();
+                location.reload(); // إعادة تحميل اللعبة
             }
 
+            // حذف العائق إذا خرج من الشاشة وزيادة النقاط
             if (obstacles[i].x + obstacles[i].width < 0) {
                 obstacles.splice(i, 1);
                 score++;
                 scoreElement.innerText = "Score: " + score;
-                gameSpeed += 0.1; // زيادة الصعوبة تدريجيًا
+                gameSpeed += 0.05; // زيادة الصعوبة تدريجيًا
             }
         }
     }
@@ -101,15 +129,28 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // رسم الديناصور
-        ctx.fillStyle = dino.color;
-        ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+        // --- رسم الروبوت بدلاً من المربع ---
+        if (robotImg.complete) { // التأكد من تحميل الصورة أولاً
+            ctx.drawImage(robotImg, dino.x, dino.y, dino.width, dino.height); //
+        } else {
+            // رسم مربع مؤقت في حال لم يتم تحميل الصورة
+            ctx.fillStyle = "#555";
+            ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+        }
 
         // رسم العوائق
         for (let obs of obstacles) {
             ctx.fillStyle = obs.color;
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
         }
+        
+        // رسم خط الأرض
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height - 10);
+        ctx.lineTo(canvas.width, canvas.height - 10);
+        ctx.stroke();
     }
 
     function gameLoop() {
@@ -118,8 +159,9 @@
         requestAnimationFrame(gameLoop);
     }
 
+    // التحكم بالقفز
     window.addEventListener("keydown", (e) => {
-        if (e.code === "Space" && dino.grounded) {
+        if ((e.code === "Space" || e.code === "ArrowUp") && dino.grounded) {
             dino.dy = -dino.jumpForce;
             dino.grounded = false;
         }

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>BEMAX Runner Game</title>
+    <style>
+        body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f7f7f7; font-family: Arial, sans-serif; overflow: hidden; }
+        #gameCanvas { border-bottom: 2px solid #535353; background-color: #fff; }
+        .info { position: absolute; top: 10px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="info">
+    <h2>اضغط على المسافة (Space) للقفز</h2>
+    <div id="score">Score: 0</div>
+</div>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreElement = document.getElementById("score");
+
+    canvas.width = 800;
+    canvas.height = 200;
+
+    let score = 0;
+    let gameSpeed = 5;
+    let isGameOver = false;
+
+    // خصائص اللاعب
+    const dino = {
+        x: 50,
+        y: 150,
+        width: 40,
+        height: 40,
+        color: "#555",
+        dy: 0,
+        jumpForce: 12,
+        gravity: 0.6,
+        grounded: false
+    };
+
+    // العوائق
+    const obstacles = [];
+
+    function spawnObstacle() {
+        let size = Math.random() * (50 - 20) + 20;
+        obstacles.push({
+            x: canvas.width,
+            y: canvas.height - size,
+            width: 20,
+            height: size,
+            color: "#ff4d4d"
+        });
+    }
+
+    function update() {
+        if (isGameOver) return;
+
+        // حركة الديناصور والجاذبية
+        dino.dy += dino.gravity;
+        dino.y += dino.dy;
+
+        if (dino.y + dino.height > canvas.height) {
+            dino.y = canvas.height - dino.height;
+            dino.dy = 0;
+            dino.grounded = true;
+        }
+
+        // تحريك العوائق
+        if (Math.random() < 0.02) {
+            if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < canvas.width - 200) {
+                spawnObstacle();
+            }
+        }
+
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            obstacles[i].x -= gameSpeed;
+
+            // التصادم
+            if (dino.x < obstacles[i].x + obstacles[i].width &&
+                dino.x + dino.width > obstacles[i].x &&
+                dino.y < obstacles[i].y + obstacles[i].height &&
+                dino.y + dino.height > obstacles[i].y) {
+                isGameOver = true;
+                alert("Game Over! Score: " + score);
+                location.reload();
+            }
+
+            if (obstacles[i].x + obstacles[i].width < 0) {
+                obstacles.splice(i, 1);
+                score++;
+                scoreElement.innerText = "Score: " + score;
+                gameSpeed += 0.1; // زيادة الصعوبة تدريجيًا
+            }
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // رسم الديناصور
+        ctx.fillStyle = dino.color;
+        ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+
+        // رسم العوائق
+        for (let obs of obstacles) {
+            ctx.fillStyle = obs.color;
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && dino.grounded) {
+            dino.dy = -dino.jumpForce;
+            dino.grounded = false;
+        }
+    });
+
+    gameLoop();
+</script>
+</body>
+</html>

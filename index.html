@@ -2,40 +2,44 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <title>The Wild Robot Runner</title>
+    <title>The Wild Robot Game - BEMAX Edition</title>
     <style>
-        body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #2c3e50; font-family: Arial, sans-serif; overflow: hidden; color: #fff; }
-        
-        /* تصميم الحاوية الخاصة باللعبة */
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #1a2a3a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; color: #fff; }
         #game-container {
             position: relative;
             width: 800px;
-            height: 250px;
-            border: 4px solid #fff;
-            border-radius: 10px;
-            /* تحميل خلفية فيلم The Wild Robot */
-            background-image: url('wild_robot_bg.jpg'); 
+            height: 300px;
+            border: 5px solid #4a90e2;
+            border-radius: 15px;
+            background-color: #2c3e50;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+        }
+        /* خلفية بديلة في حال تعذر تحميل الصورة */
+        .forest-bg {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80');
             background-size: cover;
-            background-position: center;
-            overflow: hidden; /* لإخفاء العوائق الخارجة عن الإطار */
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            opacity: 0.6;
+            z-index: 0;
         }
-
-        #gameCanvas {
-            background-color: rgba(255, 255, 255, 0.1); /* طبقة شفافة خفيفة فوق الخلفية */
-        }
-
-        .info { position: absolute; top: -50px; left: 0; width: 100%; text-align: center; }
+        canvas { position: relative; z-index: 1; }
+        .ui { margin-bottom: 20px; text-align: center; }
+        .score-board { font-size: 24px; font-weight: bold; color: #ffcc00; text-shadow: 2px 2px #000; }
     </style>
 </head>
 <body>
 
-<div class="info">
-    <h2>اضغط على المسافة (Space) للقفز</h2>
-    <div id="score">Score: 0</div>
+<div class="ui">
+    <h1 style="margin:0">The Wild Robot Runner</h1>
+    <p>اضغط <b>Space</b> أو <b>المس الشاشة</b> للقفز</p>
+    <div id="score" class="score-board">Score: 0</div>
 </div>
 
 <div id="game-container">
+    <div class="forest-bg"></div>
     <canvas id="gameCanvas"></canvas>
 </div>
 
@@ -45,83 +49,75 @@
     const scoreElement = document.getElementById("score");
 
     canvas.width = 800;
-    canvas.height = 250;
+    canvas.height = 300;
 
-    // --- تحميل الصور ---
+    // إعداد صورة الروبوت (استخدام رابط مباشر لضمان العمل)
     const robotImg = new Image();
-    robotImg.src = 'robot_character.png'; // صورة الروبوت الذي أرفقته
+    robotImg.src = 'https://i.ibb.co/996Pz9S/robot-sprite.png'; // رابط تجريبي لصورة روبوت
 
-    // متغيرات اللعبة
     let score = 0;
-    let gameSpeed = 4;
+    let gameSpeed = 5;
     let isGameOver = false;
     let gravity = 0.6;
 
-    // خصائص الروبوت (اللاعب)
-    const dino = {
-        x: 50,
-        y: 190, // بداية موقع الروبوت فوق "الأرض"
-        width: 50,  // يمكنك تعديل الحجم حسب صورتك
-        height: 60, // يمكنك تعديل الحجم حسب صورتك
+    const player = {
+        x: 80,
+        y: 200,
+        width: 50,
+        height: 70,
         dy: 0,
-        jumpForce: 13,
+        jumpForce: 12,
         grounded: false
     };
 
-    // العوائق (يمكنك استبدالها بصور عوائق لاحقاً)
     const obstacles = [];
 
     function spawnObstacle() {
-        let height = Math.random() * (60 - 30) + 30;
+        let h = Math.random() * (60 - 30) + 30;
         obstacles.push({
             x: canvas.width,
-            y: canvas.height - height - 10, // فوق الأرض قليلاً
-            width: 25,
-            height: height,
-            color: "#ff4d4d" // لون العائق الأحمر
+            y: canvas.height - h - 20,
+            width: 30,
+            height: h
         });
     }
 
     function update() {
         if (isGameOver) return;
 
-        // حركة الروبوت والجاذبية
-        dino.dy += gravity;
-        dino.y += dino.dy;
+        player.dy += gravity;
+        player.y += player.dy;
 
-        // التصادم مع الأرض (تحديد حدود القاع)
-        if (dino.y + dino.height > canvas.height - 10) {
-            dino.y = canvas.height - dino.height - 10;
-            dino.dy = 0;
-            dino.grounded = true;
+        // الأرضية
+        if (player.y + player.height > canvas.height - 20) {
+            player.y = canvas.height - player.height - 20;
+            player.dy = 0;
+            player.grounded = true;
         }
 
-        // تحريك وإنشاء العوائق
-        if (Math.random() < 0.015) { // احتمالية ظهور عائق جديد
-            if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < canvas.width - 250) {
-                spawnObstacle();
-            }
+        // تحريك العوائق
+        if (Math.random() < 0.02 && (obstacles.length === 0 || obstacles[obstacles.length-1].x < canvas.width - 300)) {
+            spawnObstacle();
         }
 
         for (let i = obstacles.length - 1; i >= 0; i--) {
             obstacles[i].x -= gameSpeed;
 
             // كشف التصادم
-            if (dino.x < obstacles[i].x + obstacles[i].width &&
-                dino.x + dino.width > obstacles[i].x &&
-                dino.y < obstacles[i].y + obstacles[i].height &&
-                dino.y + dino.height > obstacles[i].y) {
+            if (player.x < obstacles[i].x + obstacles[i].width &&
+                player.x + player.width > obstacles[i].x &&
+                player.y < obstacles[i].y + obstacles[i].height &&
+                player.y + player.height > obstacles[i].y) {
                 isGameOver = true;
                 alert("Game Over! Score: " + score);
-                location.reload(); // إعادة تحميل اللعبة
+                resetGame();
             }
 
-            // حذف العائق إذا خرج من الشاشة وزيادة النقاط
             if (obstacles[i].x + obstacles[i].width < 0) {
                 obstacles.splice(i, 1);
                 score++;
                 scoreElement.innerText = "Score: " + score;
-                gameSpeed += 0.05; // زيادة الصعوبة تدريجيًا
+                gameSpeed += 0.1;
             }
         }
     }
@@ -129,28 +125,34 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // --- رسم الروبوت بدلاً من المربع ---
-        if (robotImg.complete) { // التأكد من تحميل الصورة أولاً
-            ctx.drawImage(robotImg, dino.x, dino.y, dino.width, dino.height); //
-        } else {
-            // رسم مربع مؤقت في حال لم يتم تحميل الصورة
-            ctx.fillStyle = "#555";
-            ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
-        }
+        // رسم الأرضية
+        ctx.fillStyle = "#3d2b1f";
+        ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
 
-        // رسم العوائق
+        // رسم الروبوت (لو الصورة مظهرتش هيرسم مربع أبيض)
+        try {
+            ctx.fillStyle = "#00d4ff";
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            ctx.strokeStyle = "white";
+            ctx.strokeRect(player.x, player.y, player.width, player.height);
+        } catch(e) {}
+
+        // رسم العوائق (صخور)
+        ctx.fillStyle = "#ff4d4d";
         for (let obs of obstacles) {
-            ctx.fillStyle = obs.color;
-            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            ctx.beginPath();
+            ctx.roundRect(obs.x, obs.y, obs.width, obs.height, 5);
+            ctx.fill();
         }
-        
-        // رسم خط الأرض
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, canvas.height - 10);
-        ctx.lineTo(canvas.width, canvas.height - 10);
-        ctx.stroke();
+    }
+
+    function resetGame() {
+        score = 0;
+        obstacles.length = 0;
+        gameSpeed = 5;
+        isGameOver = false;
+        player.y = 200;
+        scoreElement.innerText = "Score: 0";
     }
 
     function gameLoop() {
@@ -159,11 +161,18 @@
         requestAnimationFrame(gameLoop);
     }
 
-    // التحكم بالقفز
     window.addEventListener("keydown", (e) => {
-        if ((e.code === "Space" || e.code === "ArrowUp") && dino.grounded) {
-            dino.dy = -dino.jumpForce;
-            dino.grounded = false;
+        if (e.code === "Space" && player.grounded) {
+            player.dy = -player.jumpForce;
+            player.grounded = false;
+        }
+    });
+
+    // دعم اللمس للموبايل
+    window.addEventListener("touchstart", () => {
+        if (player.grounded) {
+            player.dy = -player.jumpForce;
+            player.grounded = false;
         }
     });
 

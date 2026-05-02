@@ -3,52 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Wild Robot - Mobile Version</title>
+    <title>The Wild Robot - BEMAX Edition</title>
     <style>
-        body { margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #0d1b2a; font-family: sans-serif; overflow: hidden; touch-action: manipulation; }
-        #game-container { position: relative; width: 95vw; max-width: 800px; height: 250px; border: 3px solid #4a90e2; border-radius: 10px; overflow: hidden; background: linear-gradient(to bottom, #1b263b, #415a77); }
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #0d1b2a; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: manipulation; }
+        #game-container { position: relative; width: 95vw; max-width: 800px; height: 300px; border: 4px solid #4a90e2; border-radius: 15px; overflow: hidden; background: linear-gradient(to bottom, #1b263b 0%, #415a77 100%); box-shadow: 0 0 30px rgba(74,144,226,0.3); }
         canvas { display: block; width: 100%; height: 100%; }
-        .score { position: absolute; top: 10px; right: 20px; font-size: 24px; color: #ffcc00; font-weight: bold; z-index: 10; }
-        .hint { color: #fff; margin-top: 10px; font-size: 14px; }
+        .ui-overlay { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
+        .stat-box { background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 1px solid #4a90e2; }
+        .score-val { color: #ffcc00; font-weight: bold; font-size: 20px; }
+        .high-score { color: #00f2ff; font-size: 14px; }
+        .instructions { color: rgba(255,255,255,0.7); margin-top: 10px; font-size: 14px; }
     </style>
 </head>
 <body>
 
-<div id="score" class="score">0</div>
+<div class="ui-overlay">
+    <div class="stat-box">Score: <span id="score" class="score-val">0</span></div>
+    <div class="stat-box">Best: <span id="highScore" class="high-score">0</span></div>
+</div>
+
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 </div>
-<p class="hint">المس الشاشة أو اضغط Space للقفز</p>
+<p class="instructions">اضغط Space أو المس الشاشة للقفز</p>
 
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     const scoreElement = document.getElementById("score");
+    const highScoreElement = document.getElementById("highScore");
 
     canvas.width = 800;
-    canvas.height = 250;
+    canvas.height = 300;
 
+    // إعدادات اللعبة
     let score = 0;
+    let highScore = localStorage.getItem("dinoHighScore") || 0;
+    highScoreElement.innerText = highScore;
+
     let gameSpeed = 5;
     let isGameOver = false;
     let gravity = 0.6;
 
+    // كائن الروبوت (مرسوم بالكود بناءً على صورتك)
     const robot = {
-        x: 50, y: 170, width: 40, height: 60, dy: 0, jumpForce: 13, grounded: false,
+        x: 80, y: 200, width: 45, height: 70, dy: 0, jumpForce: 13, grounded: false,
         draw() {
-            ctx.fillStyle = "#e0e1dd"; 
+            ctx.save();
+            // ظل تحت الروبوت
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
             ctx.beginPath();
-            ctx.roundRect(this.x, this.y, this.width, this.height, 8);
+            ctx.ellipse(this.x + this.width/2, 285, 20, 5, 0, 0, Math.PI*2);
             ctx.fill();
+
+            // الجسم الفضي (ROZZUM)
             ctx.fillStyle = "#e0e1dd";
             ctx.beginPath();
-            ctx.arc(this.x + this.width/2, this.y - 8, 18, 0, Math.PI*2);
+            ctx.roundRect(this.x, this.y, this.width, this.height, 10);
             ctx.fill();
-            ctx.fillStyle = "#00f2ff"; // عيون الروبوت الزرقاء المضيئة
+            
+            // تفاصيل الصدر الزرقاء
+            ctx.strokeStyle = "#00f2ff";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x + 5, this.y + 15, this.width - 10, 20);
+
+            // الرأس
+            ctx.fillStyle = "#e0e1dd";
             ctx.beginPath();
-            ctx.arc(this.x + this.width/2 - 6, this.y - 10, 3, 0, Math.PI*2);
-            ctx.arc(this.x + this.width/2 + 6, this.y - 10, 3, 0, Math.PI*2);
+            ctx.arc(this.x + this.width/2, this.y - 12, 22, 0, Math.PI*2);
             ctx.fill();
+
+            // العيون الزرقاء المضيئة
+            ctx.fillStyle = "#00f2ff";
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#00f2ff";
+            ctx.beginPath();
+            ctx.arc(this.x + this.width/2 - 8, this.y - 15, 4, 0, Math.PI*2);
+            ctx.arc(this.x + this.width/2 + 8, this.y - 15, 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
         },
         jump() {
             if (this.grounded) {
@@ -60,55 +93,79 @@
 
     const obstacles = [];
     function spawnObstacle() {
-        let size = Math.random() * (50 - 20) + 20;
-        obstacles.push({ x: canvas.width, y: canvas.height - size - 20, width: 25, height: size });
+        let size = Math.random() * (60 - 30) + 30;
+        obstacles.push({ x: canvas.width, y: canvas.height - size - 20, width: 30, height: size });
     }
 
     function update() {
         if (isGameOver) return;
+        
         robot.dy += gravity;
         robot.y += robot.dy;
 
+        // حدود الأرضية
         if (robot.y + robot.height > canvas.height - 20) {
             robot.y = canvas.height - robot.height - 20;
             robot.dy = 0;
             robot.grounded = true;
         }
 
-        if (Math.random() < 0.015 && (obstacles.length === 0 || obstacles[obstacles.length-1].x < canvas.width - 280)) {
+        // إنشاء العوائق بشكل ذكي
+        if (Math.random() < 0.02 && (obstacles.length === 0 || obstacles[obstacles.length-1].x < canvas.width - 300)) {
             spawnObstacle();
         }
 
         for (let i = obstacles.length - 1; i >= 0; i--) {
             obstacles[i].x -= gameSpeed;
+
+            // كشف التصادم
             if (robot.x < obstacles[i].x + obstacles[i].width &&
                 robot.x + robot.width > obstacles[i].x &&
                 robot.y < obstacles[i].y + obstacles[i].height &&
                 robot.y + robot.height > obstacles[i].y) {
-                isGameOver = true;
-                alert("Game Over! Score: " + score);
-                location.reload();
+                handleGameOver();
             }
+
+            // تخطي العائق بنجاح
             if (obstacles[i].x + obstacles[i].width < 0) {
                 obstacles.splice(i, 1);
                 score++;
                 scoreElement.innerText = score;
-                gameSpeed += 0.1;
+                if (score % 5 === 0) gameSpeed += 0.2; // تدرج الصعوبة
             }
         }
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // رسم الأرضية (تربة الغابة)
         ctx.fillStyle = "#1b263b";
         ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
         robot.draw();
-        ctx.fillStyle = "#ff4d4d";
+
+        // رسم العوائق (صخور حمراء مضيئة)
         for (let obs of obstacles) {
+            ctx.fillStyle = "#ff4d4d";
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = "red";
             ctx.beginPath();
             ctx.roundRect(obs.x, obs.y, obs.width, obs.height, 5);
             ctx.fill();
+            ctx.shadowBlur = 0;
         }
+    }
+
+    function handleGameOver() {
+        isGameOver = true;
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem("dinoHighScore", highScore);
+            highScoreElement.innerText = highScore;
+        }
+        alert("انتهت اللعبة! النتيجة: " + score);
+        location.reload();
     }
 
     function gameLoop() {
@@ -117,10 +174,10 @@
         requestAnimationFrame(gameLoop);
     }
 
-    // دعم الموبايل والكمبيوتر معاً
+    // دعم التحكم للكمبيوتر والموبايل
     window.addEventListener("keydown", (e) => { if (e.code === "Space") robot.jump(); });
     window.addEventListener("touchstart", (e) => { 
-        e.preventDefault(); // يمنع زووم المتصفح عند اللمس المتكرر
+        e.preventDefault(); 
         robot.jump(); 
     }, { passive: false });
 

@@ -3,29 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Wild Robot - Pro Edition</title>
+    <title>The Wild Robot - BEMAX Edition</title>
     <style>
-        body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #0d1b2a; font-family: sans-serif; overflow: hidden; touch-action: manipulation; }
-        #game-container { position: relative; width: 95vw; max-width: 800px; height: 300px; border: 4px solid #4a90e2; border-radius: 15px; overflow: hidden; background: linear-gradient(to bottom, #1b263b, #415a77); }
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #0d1b2a; font-family: sans-serif; overflow: hidden; touch-action: manipulation; }
+        #game-container { 
+            position: relative; 
+            width: 95vw; 
+            max-width: 800px; 
+            height: 300px; 
+            border: 4px solid #4a90e2; 
+            border-radius: 15px; 
+            overflow: hidden; 
+            background-color: #1b263b;
+            box-shadow: 0 0 30px rgba(74,144,226,0.3); 
+        }
         canvas { display: block; width: 100%; height: 100%; }
         .ui-overlay { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; z-index: 10; }
-        .stat-box { background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; color: #ffcc00; font-weight: bold; border: 1px solid #4a90e2; }
-        .instructions { color: #e0e1dd; margin-top: 10px; font-size: 14px; text-align: center; }
+        .stat-box { background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; color: #ffcc00; font-weight: bold; border: 1px solid #00f2ff; min-width: 100px; text-align: center; }
+        .instructions { color: #e0e1dd; margin-top: 10px; font-size: 13px; text-align: center; line-height: 1.5; }
     </style>
 </head>
 <body>
 
 <div class="ui-overlay">
-    <div class="stat-box">Score: <span id="score">0</span></div>
-    <div class="stat-box">Best: <span id="highScore">0</span></div>
+    <div class="stat-box">Distance: <span id="score">0</span> m</div>
+    <div class="stat-box">Best: <span id="highScore">0</span> m</div>
 </div>
 
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 </div>
+
 <div class="instructions">
-    للكمبيوتر: <b>Space</b> للقفز | <b>Arrow Down</b> للانحناء <br>
-    للموبايل: <b>المس الشاشة</b> للقفز
+    <b>الكمبيوتر:</b> Space للقفز | Arrow Down للانحناء <br>
+    <b>الموبايل:</b> يمين الشاشة للقفز | يسار الشاشة للانحناء
 </div>
 
 <script>
@@ -37,15 +48,21 @@
     canvas.width = 800;
     canvas.height = 300;
 
-    // --- المحرك الصوتي (Web Audio API) ---
+    // --- تحميل الصور ---
+    const bgImg = new Image();
+    bgImg.src = 'wild_robot_bg.jpg'; // الصورة التي رفعتها على GitHub
+    
+    let bgX = 0; // لموقع الخلفية المتحركة
+
+    // --- المحرك الصوتي ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(freq, type, duration) {
+        if (audioCtx.state === 'suspended') return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
@@ -53,71 +70,103 @@
     }
 
     let score = 0;
-    let highScore = localStorage.getItem("wildRobotHighScore") || 0;
+    let highScore = localStorage.getItem("wildRobotDistance") || 0;
     highScoreElement.innerText = highScore;
     let gameSpeed = 5;
     let isGameOver = false;
+    let frameCount = 0;
 
     const robot = {
-        x: 50, y: 200, width: 45, height: 75, 
-        baseHeight: 75, crouchHeight: 40,
+        x: 80, y: 200, width: 45, height: 75,
+        baseHeight: 75, crouchHeight: 45,
         dy: 0, jumpForce: 13, grounded: false, isCrouching: false,
+        legAngle: 0,
         draw() {
             ctx.save();
-            // الروبوت (مرسوم بالكود بناءً على صورتك)
-            ctx.fillStyle = "#e0e1dd";
             let drawY = this.isCrouching ? this.y + (this.baseHeight - this.crouchHeight) : this.y;
             let drawH = this.isCrouching ? this.crouchHeight : this.height;
-            
+
+            // حركة الأرجل (Animation)
+            if (this.grounded && !this.isCrouching) {
+                this.legAngle = Math.sin(frameCount * 0.15) * 20;
+            } else {
+                this.legAngle = 0;
+            }
+
+            ctx.strokeStyle = "#e0e1dd";
+            ctx.lineWidth = 6;
+            // الأرجل
             ctx.beginPath();
-            ctx.roundRect(this.x, drawY, this.width, drawH, 10);
+            ctx.moveTo(this.x + 15, drawY + drawH - 10);
+            ctx.lineTo(this.x + 15 + this.legAngle, drawY + drawH + 15);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(this.x + 30, drawY + drawH - 10);
+            ctx.lineTo(this.x + 30 - this.legAngle, drawY + drawH + 15);
+            ctx.stroke();
+
+            // جسم الروبوت (Roz)
+            ctx.fillStyle = "#e0e1dd";
+            ctx.beginPath();
+            ctx.roundRect(this.x, drawY, this.width, drawH - 10, 8);
             ctx.fill();
 
-            // الرأس والعين (تتحرك مع الانحناء)
-            let headY = this.isCrouching ? drawY - 5 : this.y - 12;
+            // الرأس والعيون الزرقاء
+            let headY = this.isCrouching ? drawY - 2 : this.y - 12;
             ctx.beginPath();
             ctx.arc(this.x + this.width/2, headY, 20, 0, Math.PI*2);
             ctx.fill();
-            
             ctx.fillStyle = "#00f2ff";
             ctx.beginPath();
-            ctx.arc(this.x + this.width/2 - 7, headY - 3, 4, 0, Math.PI*2);
-            ctx.arc(this.x + this.width/2 + 7, headY - 3, 4, 0, Math.PI*2);
+            ctx.arc(this.x + this.width/2 - 8, headY - 3, 4, 0, Math.PI*2);
+            ctx.arc(this.x + this.width/2 + 8, headY - 3, 4, 0, Math.PI*2);
             ctx.fill();
             ctx.restore();
+        },
+        jump() {
+            if (this.grounded) {
+                this.dy = -this.jumpForce;
+                this.grounded = false;
+                playSound(440, 'sine', 0.1);
+            }
         }
     };
 
     const obstacles = [];
     function spawnObstacle() {
-        const type = Math.random() > 0.3 ? 'ground' : 'air';
+        const type = Math.random() > 0.4 ? 'ground' : 'air';
         if (type === 'ground') {
-            obstacles.push({ x: canvas.width, y: 230, width: 30, height: 50, type: 'ground' });
+            obstacles.push({ x: canvas.width, y: 240, width: 30, height: 40, type: 'ground' });
         } else {
-            obstacles.push({ x: canvas.width, y: 150, width: 40, height: 30, type: 'air' });
+            obstacles.push({ x: canvas.width, y: 140, width: 45, height: 25, type: 'air' });
         }
     }
 
     function update() {
         if (isGameOver) return;
+        frameCount++;
         
-        robot.dy += 0.6; // Gravity
+        // تحريك الخلفية (Lapping Background)
+        bgX -= gameSpeed * 0.5;
+        if (bgX <= -canvas.width) bgX = 0;
+
+        // حساب المسافة بالأمتار
+        score += Math.floor(gameSpeed / 5);
+        scoreElement.innerText = score;
+
+        robot.dy += 0.7; // Gravity
         robot.y += robot.dy;
 
-        if (robot.y + robot.height > 280) {
-            robot.y = 280 - robot.height;
+        if (robot.y + robot.height > 275) {
+            robot.y = 275 - robot.height;
             robot.dy = 0;
             robot.grounded = true;
         }
 
-        if (Math.random() < 0.015 && (obstacles.length === 0 || obstacles[obstacles.length-1].x < canvas.width - 300)) {
-            spawnObstacle();
-        }
+        if (frameCount % 100 === 0) spawnObstacle();
 
         for (let i = obstacles.length - 1; i >= 0; i--) {
             obstacles[i].x -= gameSpeed;
-            
-            // حساب منطقة الاصطدام بناءً على حالة الانحناء
             let rY = robot.isCrouching ? robot.y + (robot.baseHeight - robot.crouchHeight) : robot.y;
             let rH = robot.isCrouching ? robot.crouchHeight : robot.height;
 
@@ -127,21 +176,22 @@
                 rY + rH > obstacles[i].y) {
                 gameOver();
             }
-
-            if (obstacles[i].x + obstacles[i].width < 0) {
-                obstacles.splice(i, 1);
-                score++;
-                scoreElement.innerText = score;
-                gameSpeed += 0.05;
-            }
+            if (obstacles[i].x + obstacles[i].width < 0) obstacles.splice(i, 1);
         }
+        if (frameCount % 500 === 0) gameSpeed += 0.5;
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#1b263b";
-        ctx.fillRect(0, 280, canvas.width, 20); // Ground
+        
+        // رسم الخلفية المتحركة
+        if (bgImg.complete) {
+            ctx.drawImage(bgImg, bgX, 0, canvas.width, canvas.height);
+            ctx.drawImage(bgImg, bgX + canvas.width, 0, canvas.width, canvas.height);
+        }
+
         robot.draw();
+
         for (let obs of obstacles) {
             ctx.fillStyle = obs.type === 'ground' ? "#ff4d4d" : "#ffcc00";
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
@@ -150,48 +200,31 @@
 
     function gameOver() {
         isGameOver = true;
-        playSound(150, 'sawtooth', 0.5); // صوت الخسارة
-        if (score > highScore) {
-            localStorage.setItem("wildRobotHighScore", score);
-        }
-        alert("انتهت اللعبة! النتيجة: " + score);
+        playSound(150, 'sawtooth', 0.5);
+        if (score > highScore) localStorage.setItem("wildRobotDistance", score);
+        alert("المسافة المقطوعة: " + score + " متر");
         location.reload();
     }
 
-    function gameLoop() {
-        update(); draw();
-        requestAnimationFrame(gameLoop);
-    }
-
-    // التحكم بالكمبيوتر
+    // التحكم (كمبيوتر + موبايل)
     window.addEventListener("keydown", (e) => {
         if (audioCtx.state === 'suspended') audioCtx.resume();
-        if (e.code === "Space" && robot.grounded) {
-            robot.dy = -robot.jumpForce;
-            robot.grounded = false;
-            playSound(440, 'sine', 0.1); // صوت القفز
-        }
-        if (e.code === "ArrowDown") {
-            robot.isCrouching = true;
-            playSound(200, 'square', 0.05); // صوت الانحناء
-        }
+        if (e.code === "Space") robot.jump();
+        if (e.code === "ArrowDown") { robot.isCrouching = true; playSound(200, 'square', 0.05); }
     });
+    window.addEventListener("keyup", (e) => { if (e.code === "ArrowDown") robot.isCrouching = false; });
 
-    window.addEventListener("keyup", (e) => {
-        if (e.code === "ArrowDown") robot.isCrouching = false;
-    });
-
-    // دعم الموبايل (لمس للقفز)
     window.addEventListener("touchstart", (e) => {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         e.preventDefault();
-        if (robot.grounded) {
-            robot.dy = -robot.jumpForce;
-            robot.grounded = false;
-            playSound(440, 'sine', 0.1);
-        }
+        const touchX = e.touches[0].clientX;
+        if (touchX > window.innerWidth / 2) robot.jump();
+        else robot.isCrouching = true;
     }, { passive: false });
 
+    window.addEventListener("touchend", () => { robot.isCrouching = false; });
+
+    function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
     gameLoop();
 </script>
 </body>

@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Wild Robot Pro - Realistic Motion</title>
+    <title>The Wild Robot - BEMAX Pro</title>
     <style>
         body { margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #050a0f; font-family: sans-serif; overflow: hidden; touch-action: none; }
-        #game-container { position: relative; width: 95vw; max-width: 850px; height: 350px; border: 3px solid #00f2ff; border-radius: 20px; overflow: hidden; background: #1b263b; box-shadow: 0 0 50px rgba(0, 242, 255, 0.2); }
+        #game-container { position: relative; width: 95vw; max-width: 850px; height: 350px; border: 3px solid #00f2ff; border-radius: 20px; overflow: hidden; box-shadow: 0 0 50px rgba(0, 242, 255, 0.2); }
         canvas { display: block; width: 100%; height: 100%; }
-        .stats { position: absolute; top: 15px; left: 0; width: 100%; display: flex; justify-content: space-around; pointer-events: none; z-index: 100; }
+        .stats { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; z-index: 100; }
         .box { background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 12px; border: 1px solid #00f2ff; color: #00f2ff; font-weight: bold; font-family: monospace; font-size: 20px; }
-        .controls-hint { color: rgba(255,255,255,0.5); margin-top: 15px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -23,7 +22,6 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 </div>
-<div class="controls-hint">PC: Space & Down Arrow | Mobile: Tap Right to Jump, Left to Duck</div>
 
 <script>
     const canvas = document.getElementById("gameCanvas");
@@ -34,10 +32,12 @@
     canvas.width = 800;
     canvas.height = 350;
 
-    // تحميل الخلفية التي رفعتها أنت
+    // --- تحميل الصور ---
     const bgImg = new Image();
     bgImg.src = 'wild_robot_bg.jpg';
-    let bgX = 0;
+    
+    const robotImg = new Image();
+    robotImg.src = 'robot_character.png'; // تأكد أن صورة الروبوت بهذا الاسم في ملفاتك
 
     let score = 0;
     let highScore = localStorage.getItem("robotBestDist") || 0;
@@ -45,68 +45,42 @@
     let gameSpeed = 6;
     let isGameOver = false;
     let frame = 0;
+    let bgX = 0;
 
     const robot = {
-        x: 100, y: 240, width: 50, height: 80,
-        dy: 0, jumpForce: 14, grounded: false, isCrouching: false,
-        legPhase: 0,
+        x: 100, y: 220, width: 60, height: 90,
+        baseHeight: 90, crouchHeight: 50,
+        dy: 0, jumpForce: 15, grounded: false, isCrouching: false,
+        legOffset: 0,
         draw() {
             ctx.save();
-            let drawY = this.isCrouching ? this.y + 35 : this.y;
-            let drawH = this.isCrouching ? 45 : this.height;
+            let drawH = this.isCrouching ? this.crouchHeight : this.height;
+            let drawY = this.isCrouching ? this.y + (this.baseHeight - this.crouchHeight) : this.y;
 
-            // --- حركة الأرجل الواقعية ---
-            this.legPhase += gameSpeed * 0.04;
-            const leg1 = Math.sin(this.legPhase) * 20;
-            const leg2 = Math.sin(this.legPhase + Math.PI) * 20;
-
-            ctx.strokeStyle = "#999";
-            ctx.lineWidth = 8;
-            ctx.lineCap = "round";
-
-            if (this.grounded && !this.isCrouching) {
-                // الرجل 1
-                ctx.beginPath(); ctx.moveTo(this.x + 15, drawY + drawH - 10);
-                ctx.lineTo(this.x + 10 + leg1, drawY + drawH + 15); ctx.stroke();
-                // الرجل 2
-                ctx.beginPath(); ctx.moveTo(this.x + 35, drawY + drawH - 10);
-                ctx.lineTo(this.x + 40 + leg2, drawY + drawH + 15); ctx.stroke();
-            }
-
-            // --- الجسم (الروبوت الفضي) ---
-            ctx.fillStyle = "#e0e1dd";
-            ctx.beginPath();
-            ctx.roundRect(this.x, drawY, this.width, drawH - 10, 10);
-            ctx.fill();
-
-            // الرأس (يتحرك للأعلى والأسفل قليلاً أثناء الجري)
-            let bounce = Math.cos(this.legPhase * 2) * 3;
-            let headY = (this.isCrouching ? drawY + 5 : this.y - 15) + bounce;
+            // تأثير حركة الأرجل الواقعي (اهتزاز طفيف للجسم يوحي بالجري)
+            this.legOffset = Math.sin(frame * 0.2) * 3;
             
-            ctx.beginPath();
-            ctx.arc(this.x + this.width/2, headY, 22, 0, Math.PI*2);
-            ctx.fill();
-
-            // العيون الزرقاء المتوهجة
-            ctx.fillStyle = "#00f2ff";
-            ctx.shadowBlur = 15; ctx.shadowColor = "#00f2ff";
-            ctx.beginPath();
-            ctx.arc(this.x + this.width/2 - 8, headY - 4, 5, 0, Math.PI*2);
-            ctx.arc(this.x + this.width/2 + 8, headY - 4, 5, 0, Math.PI*2);
-            ctx.fill();
+            if (robotImg.complete) {
+                // رسم الشخصية الحقيقية مع تعديل الارتفاع عند الانحناء
+                ctx.drawImage(robotImg, this.x, drawY + this.legOffset, this.width, drawH);
+            } else {
+                // شكل احتياطي لو الصورة لم تحمل
+                ctx.fillStyle = "#e0e1dd";
+                ctx.fillRect(this.x, drawY, this.width, drawH);
+            }
             ctx.restore();
         }
     };
 
     const obstacles = [];
     function spawnObstacle() {
-        const isAir = Math.random() > 0.6;
+        const isAir = Math.random() > 0.5;
         if (isAir) {
-            // عائق جوي (يجب الانحناء تحته) - تم تنزيله ليكون خطيراً
-            obstacles.push({ x: canvas.width, y: 180, width: 50, height: 30, type: 'air' });
+            // عائق عالي (لازم تنحني عشان متخبطش فيه)
+            obstacles.push({ x: canvas.width, y: 190, width: 60, height: 40, type: 'air' });
         } else {
-            // عائق أرضي
-            obstacles.push({ x: canvas.width, y: 280, width: 30, height: 50, type: 'ground' });
+            // عائق أرضي (لازم تنط)
+            obstacles.push({ x: canvas.width, y: 270, width: 35, height: 45, type: 'ground' });
         }
     }
 
@@ -114,32 +88,33 @@
         if (isGameOver) return;
         frame++;
         
-        bgX -= gameSpeed * 0.7;
+        bgX -= gameSpeed * 0.8;
         if (bgX <= -canvas.width) bgX = 0;
 
-        score += Math.floor(gameSpeed / 5);
+        score += Math.floor(gameSpeed / 6);
         scoreElement.innerText = score;
 
-        robot.dy += 0.75; // جاذبية أقوى لثبات أكثر
+        robot.dy += 0.8; 
         robot.y += robot.dy;
 
-        if (robot.y + robot.height > 330) {
-            robot.y = 330 - robot.height;
+        if (robot.y + robot.height > 320) {
+            robot.y = 320 - robot.height;
             robot.dy = 0;
             robot.grounded = true;
         }
 
-        if (frame % 90 === 0) spawnObstacle();
+        if (frame % 80 === 0) spawnObstacle();
 
         for (let i = obstacles.length - 1; i >= 0; i--) {
             obstacles[i].x -= gameSpeed;
 
-            // تصادم دقيق جداً
-            let rY = robot.isCrouching ? robot.y + 35 : robot.y - 20; // شملنا الرأس في الحساب
-            let rH = robot.isCrouching ? 50 : robot.height + 20;
+            // تحديد منطقة التصادم (Hitbox) بدقة
+            let rY = robot.isCrouching ? robot.y + (robot.baseHeight - robot.crouchHeight) : robot.y;
+            let rH = robot.isCrouching ? robot.crouchHeight : robot.height;
 
-            if (robot.x + 5 < obstacles[i].x + obstacles[i].width &&
-                robot.x + robot.width - 5 > obstacles[i].x &&
+            // إذا كان الروبوت غير منحني (واقف)، رأسه سيصطدم بالعوائق العالية
+            if (robot.x + 10 < obstacles[i].x + obstacles[i].width &&
+                robot.x + robot.width - 10 > obstacles[i].x &&
                 rY < obstacles[i].y + obstacles[i].height &&
                 rY + rH > obstacles[i].y) {
                 endGame();
@@ -147,25 +122,19 @@
 
             if (obstacles[i].x + obstacles[i].width < 0) obstacles.splice(i, 1);
         }
-        if (frame % 1000 === 0) gameSpeed += 0.8;
+        if (frame % 500 === 0) gameSpeed += 0.5;
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // رسم الخلفية (مرتين لضمان التكرار)
         if (bgImg.complete) {
             ctx.drawImage(bgImg, bgX, 0, canvas.width, canvas.height);
             ctx.drawImage(bgImg, bgX + canvas.width, 0, canvas.width, canvas.height);
         }
-
         robot.draw();
-
         for (let obs of obstacles) {
             ctx.fillStyle = obs.type === 'ground' ? "#ff3e3e" : "#ffcc00";
-            ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
             ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-            ctx.shadowBlur = 0;
         }
     }
 
@@ -176,26 +145,33 @@
         location.reload();
     }
 
-    // التحكم
+    // التحكم بالكمبيوتر
     window.addEventListener("keydown", (e) => {
-        if (e.code === "Space" && robot.grounded) { robot.dy = -15; robot.grounded = false; }
+        if (e.code === "Space" && robot.grounded) { robot.dy = -16; robot.grounded = false; }
         if (e.code === "ArrowDown") robot.isCrouching = true;
     });
     window.addEventListener("keyup", (e) => { if (e.code === "ArrowDown") robot.isCrouching = false; });
 
-    // تحكم الموبايل (يمين ويسار)
+    // --- حل مشكلة الموبايل (نظام اللمس المزدوج) ---
     canvas.addEventListener("touchstart", (e) => {
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         const touchX = e.touches[0].clientX - rect.left;
-        if (touchX > canvas.width / 2) { 
-            if (robot.grounded) { robot.dy = -15; robot.grounded = false; }
-        } else {
+        
+        // النصف الأيمن من الشاشة للقفز
+        if (touchX > (canvas.offsetWidth / 2)) {
+            if (robot.grounded) { robot.dy = -16; robot.grounded = false; }
+        } 
+        // النصف الأيسر من الشاشة للانحناء
+        else {
             robot.isCrouching = true;
         }
     }, {passive: false});
 
-    canvas.addEventListener("touchend", () => { robot.isCrouching = false; });
+    canvas.addEventListener("touchend", (e) => {
+        // إنهاء الانحناء عند رفع الإصبع عن الشاشة
+        robot.isCrouching = false;
+    });
 
     function main() { update(); draw(); requestAnimationFrame(main); }
     main();
